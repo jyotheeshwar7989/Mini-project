@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../App';
+import { useAuth } from '../context/AuthContext';
 import API from '../api/axios';
 
 export default function Register() {
@@ -14,11 +14,11 @@ export default function Register() {
     const handleRegistrationError = (errObj) => {
         console.dir(errObj);
 
-        // Extracting status codes and messages across raw payloads, intercepted structures, or network errors
-        const responseStatus = errObj?.response?.status || errObj?.status || errObj?.data?.status;
-        const backendMessage = errObj?.response?.data?.message || errObj?.data?.message || errObj?.message;
+        // Extracting status codes and messages across raw payloads or infrastructure catch blocks
+        const responseStatus = errObj?.status || errObj?.response?.status || errObj?.data?.status;
+        const backendMessage = errObj?.message || errObj?.response?.data?.message || errObj?.data?.message;
 
-        // Strict fallback checking: if the Axios wrapper completely flattened the structure into a string
+        // Fallback checks for stringified errors or validation duplicates
         const isDuplicateString = JSON.stringify(errObj)?.toLowerCase().includes('exist') ||
             JSON.stringify(errObj)?.includes('409');
 
@@ -35,24 +35,26 @@ export default function Register() {
         e.preventDefault();
         setLoading(true);
         setError('');
+
         try {
+            // Your custom wrapper returns the raw parsed JSON response directly (jsonData)
             const res = await API.post('/auth/register', form);
+            console.log('API Response received:', res);
 
-            // Safely unpack payload data
-            const responsePayload = res?.data?.data || res?.data;
+            // Access the properties directly without using an extra '.data' layer
+            const token = res?.token || res?.data?.token || res?.accessToken;
+            const userData = res?.user || res?.data?.user || res;
 
-            // SUCCESS PATH: Only log in and navigate to dashboard if an auth token actually exists
-            if (responsePayload && responsePayload.token) {
-                const { token, ...userData } = responsePayload;
+            if (token) {
                 login(userData, token);
                 navigate('/dashboard');
             } else {
-                // FAILURE PATH: If a token is missing, registration was unsuccessful or intercepted.
-                // Do NOT navigate to the login page. Run the error handler instead.
-                handleRegistrationError(res);
+                // Handle structural anomalies or 200 responses that are missing fields
+                console.error("Payload missing token properties:", res);
+                setError('Account created, but a valid session token was not found. Please log in manually.');
             }
         } catch (err) {
-            // Handles true infrastructure exceptions or rejected promises
+            // Catches infrastructure failures or explicit rejections thrown by fetch
             handleRegistrationError(err);
         } finally {
             setLoading(false);
@@ -85,9 +87,9 @@ export default function Register() {
 
                 <form onSubmit={handleSubmit}>
                     {[
-                        { label: 'Full Name', name: 'fullName', type: 'text', placeholder: 'John Doe' },
-                        { label: 'Email', name: 'email', type: 'email', placeholder: 'you@example.com' },
-                        { label: 'Password', name: 'password', type: 'password', placeholder: 'Min 6 characters' }
+                        { label: 'Full Name', name: 'fullName', type: 'text', placeholder: 'Enter your Full name' },
+                        { label: 'Email', name: 'email', type: 'email', placeholder: 'Enter your email' },
+                        { label: 'Password', name: 'password', type: 'password', placeholder: 'Enter your password' }
                     ].map(({ label, name, type, placeholder }) => (
                         <div key={name} style={{ marginBottom: '16px' }}>
                             <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500', color: '#374151' }}>

@@ -1,7 +1,6 @@
-import React, { createContext, useState,
-    useEffect, useContext } from 'react';
-import { BrowserRouter, Routes, Route,
-    Navigate } from 'react-router-dom';
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
 
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -14,60 +13,8 @@ import AdminTickets from './pages/admin/AdminTickets';
 import AdminUsers from './pages/admin/AdminUsers';
 
 // ============================================
-// AUTH CONTEXT
+// Protects internal private routes
 // ============================================
-export const AuthContext = createContext(null);
-
-export function useAuth() {
-    return useContext(AuthContext);
-}
-
-function AuthProvider({ children }) {
-    const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        try {
-            const u = localStorage.getItem('user');
-            const t = localStorage.getItem('token');
-            if (u && t) {
-                setUser(JSON.parse(u));
-            }
-        } catch(e) {
-            localStorage.clear();
-        }
-        setLoading(false);
-    }, []);
-
-    const login = (userData, token) => {
-        localStorage.setItem('token', token);
-        localStorage.setItem('user',
-            JSON.stringify(userData));
-        setUser(userData);
-    };
-
-    const logout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        setUser(null);
-        // Force full page reload to reset everything
-        window.location.href = '/login';
-    };
-
-    const isAdmin = () => {
-        return user?.role === 'ROLE_ADMIN';
-    };
-
-    return (
-        <AuthContext.Provider value={{
-            user, login, logout,
-            isAdmin, loading
-        }}>
-            {children}
-        </AuthContext.Provider>
-    );
-}
-
 function ProtectedRoute({ children, adminOnly }) {
     const { user, loading, isAdmin } = useAuth();
 
@@ -79,7 +26,12 @@ function ProtectedRoute({ children, adminOnly }) {
                 alignItems: 'center',
                 height: '100vh'
             }}>
-                <p>Loading...</p>
+                <p style={{
+                    fontFamily: 'sans-serif',
+                    color: '#64748b'
+                }}>
+                    Loading Session...
+                </p>
             </div>
         );
     }
@@ -95,78 +47,135 @@ function ProtectedRoute({ children, adminOnly }) {
     return children;
 }
 
+// ============================================
+// Shields public auth routes from logged-in sessions
+// ============================================
+function PublicRoute({ children }) {
+    const { user, loading, isAdmin } = useAuth();
+
+    if (loading) return null;
+
+    if (user) {
+        return (
+            <Navigate
+                to={isAdmin() ? '/admin' : '/dashboard'}
+                replace
+            />
+        );
+    }
+
+    return children;
+}
+
+// ============================================
+// Route tree (lives inside AuthProvider so
+// useAuth works correctly)
+// ============================================
+function AppContent() {
+    return (
+        <BrowserRouter>
+            <Routes>
+                {/* Root Redirect */}
+                <Route
+                    path="/"
+                    element={<Navigate to="/login" replace />}
+                />
+
+                {/* Public Auth Gateway */}
+                <Route
+                    path="/login"
+                    element={
+                        <PublicRoute>
+                            <Login />
+                        </PublicRoute>
+                    }
+                />
+                <Route
+                    path="/register"
+                    element={
+                        <PublicRoute>
+                            <Register />
+                        </PublicRoute>
+                    }
+                />
+
+                {/* Secure Private Spaces */}
+                <Route
+                    path="/dashboard"
+                    element={
+                        <ProtectedRoute>
+                            <Dashboard />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/tickets"
+                    element={
+                        <ProtectedRoute>
+                            <MyTickets />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/tickets/new"
+                    element={
+                        <ProtectedRoute>
+                            <CreateTicket />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/tickets/:id"
+                    element={
+                        <ProtectedRoute>
+                            <TicketDetail />
+                        </ProtectedRoute>
+                    }
+                />
+
+                {/* Admin Restricted Zones */}
+                <Route
+                    path="/admin"
+                    element={
+                        <ProtectedRoute adminOnly>
+                            <AdminDashboard />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/admin/tickets"
+                    element={
+                        <ProtectedRoute adminOnly>
+                            <AdminTickets />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/admin/users"
+                    element={
+                        <ProtectedRoute adminOnly>
+                            <AdminUsers />
+                        </ProtectedRoute>
+                    }
+                />
+
+                {/* Fallback Guard */}
+                <Route
+                    path="*"
+                    element={<Navigate to="/login" replace />}
+                />
+            </Routes>
+        </BrowserRouter>
+    );
+}
+
+// ============================================
+// Main Entry — injects Auth state at the top
+// ============================================
 export default function App() {
     return (
         <AuthProvider>
-            <BrowserRouter>
-                <Routes>
-                    <Route path="/"
-                           element={
-                               <Navigate to="/login" replace />
-                           }
-                    />
-                    <Route path="/login"
-                           element={<Login />}
-                    />
-                    <Route path="/register"
-                           element={<Register />}
-                    />
-                    <Route path="/dashboard"
-                           element={
-                               <ProtectedRoute>
-                                   <Dashboard />
-                               </ProtectedRoute>
-                           }
-                    />
-                    <Route path="/tickets"
-                           element={
-                               <ProtectedRoute>
-                                   <MyTickets />
-                               </ProtectedRoute>
-                           }
-                    />
-                    <Route path="/tickets/new"
-                           element={
-                               <ProtectedRoute>
-                                   <CreateTicket />
-                               </ProtectedRoute>
-                           }
-                    />
-                    <Route path="/tickets/:id"
-                           element={
-                               <ProtectedRoute>
-                                   <TicketDetail />
-                               </ProtectedRoute>
-                           }
-                    />
-                    <Route path="/admin"
-                           element={
-                               <ProtectedRoute adminOnly>
-                                   <AdminDashboard />
-                               </ProtectedRoute>
-                           }
-                    />
-                    <Route path="/admin/tickets"
-                           element={
-                               <ProtectedRoute adminOnly>
-                                   <AdminTickets />
-                               </ProtectedRoute>
-                           }
-                    />
-                    <Route path="/admin/users"
-                           element={
-                               <ProtectedRoute adminOnly>
-                                   <AdminUsers />
-                               </ProtectedRoute>
-                           }
-                    />
-                    <Route path="*"
-                           element={
-                               <Navigate to="/login" replace />
-                           }
-                    />
-                </Routes>
-            </BrowserRouter>
+            <AppContent />
         </AuthProvider>
     );
 }

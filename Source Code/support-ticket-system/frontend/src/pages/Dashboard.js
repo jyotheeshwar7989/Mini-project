@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
-import { useAuth } from '../App';
+import { useAuth } from '../context/AuthContext';
 import API from '../api/axios';
 
 export default function Dashboard() {
@@ -11,11 +11,9 @@ export default function Dashboard() {
 
     useEffect(() => {
         API.get('/tickets/my-tickets')
-            .then(res => {
-                console.log("User Dashboard RAW Response:", res);
-
-                // Safely extract payload records independently of axios interceptor layer unwrapping
-                const cleanList = res?.data?.data || res?.data || res;
+            .then(data => {
+                console.log("Dashboard tickets response:", data);
+                const cleanList = data?.data || [];
                 setTickets(Array.isArray(cleanList) ? cleanList : []);
             })
             .catch(console.error)

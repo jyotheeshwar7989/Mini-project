@@ -1,17 +1,13 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { useAuth } from '../App';
+import { useAuth } from '../context/AuthContext';
 
 export default function Sidebar() {
     const { user, logout, isAdmin } = useAuth();
     const navigate = useNavigate();
 
     const handleLogout = () => {
-        // Clear storage
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        // Force full page reload
-        window.location.href = '/login';
+        logout();
     };
 
     const navItems = [

@@ -1,23 +1,7 @@
-// Get token from localStorage
-const getToken = () => {
-    return localStorage.getItem('token');
-};
+import { getToken, clearAuth } from '../context/AuthContext';
 
-// Clear auth and redirect to login
-const clearAuth = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    window.location.href = '/login';
-};
-
-// In Docker (production): use /api/v1 → nginx proxies to backend
-// In local development: use localhost:8080
-const BASE_URL = process.env.NODE_ENV === 'production'
-    ? '/api/v1'
-    : 'http://localhost:8080/api/v1';
-
-console.log('Environment:', process.env.NODE_ENV);
-console.log('BASE_URL:', BASE_URL);
+// Explicit browser-to-backend routing to prevent Nginx loop drops
+const BASE_URL = 'http://localhost:8080/api/v1';
 
 const API = {
     async request(method, url, data = null) {
@@ -36,29 +20,35 @@ const API = {
             options.body = JSON.stringify(data);
         }
 
+        let response;
         try {
             console.log(`API ${method}: ${BASE_URL}${url}`);
-
-            const response = await fetch(
-                `${BASE_URL}${url}`,
-                options
-            );
-
+            response = await fetch(`${BASE_URL}${url}`, options);
             console.log(`Response status: ${response.status}`);
-
-            if (response.status === 401) {
-                clearAuth();
-                return null;
-            }
-
-            const jsonData = await response.json();
-            console.log('Response data:', jsonData);
-            return jsonData;
-
-        } catch (err) {
-            console.error(`API Error ${method} ${url}:`, err);
-            throw err;
+        } catch (networkErr) {
+            console.error(`Network Connection Failure on ${url}:`, networkErr);
+            throw new Error('Cannot connect to server. Make sure the backend is running!');
         }
+
+        if (response.status === 401) {
+            clearAuth();
+            window.location.href = '/login';
+            return null;
+        }
+
+        const textData = await response.text();
+        const jsonData = textData ? JSON.parse(textData) : {};
+
+        if (!response.ok) {
+            console.error(`API bad response state (${response.status}):`, jsonData);
+            throw {
+                status: response.status,
+                message: jsonData?.message || jsonData?.error || 'Something went wrong processing your request.'
+            };
+        }
+
+        console.log('Response data:', jsonData);
+        return jsonData;
     },
 
     get(url) {

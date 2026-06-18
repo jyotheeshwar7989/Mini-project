@@ -13,3 +13,15 @@ backend/target/
 .env.production
 **/.env
 .DS_Store
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+Thumbs.db
